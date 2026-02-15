@@ -1,0 +1,134 @@
+from flask import Flask, render_template, request, redirect, url_for, session
+import sqlite3
+import bcrypt
+
+app = Flask(__name__)
+app.secret_key = "supersecretkey"
+
+
+# ---------- DATABASE SETUP ----------
+def init_db():
+    conn = sqlite3.connect("database.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            email TEXT UNIQUE,
+            password BLOB
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+
+# ---------- ROUTES ----------
+
+@app.route("/")
+def landing():
+    return render_template("landing.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form["username"]
+        email = request.form["email"]
+        password = request.form["password"]
+
+        hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+        conn = sqlite3.connect("database.db")
+        c = conn.cursor()
+
+        try:
+            c.execute(
+                "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                (username, email, hashed_pw)
+            )
+            conn.commit()
+            conn.close()
+            return redirect(url_for("login"))
+        except:
+            conn.close()
+            return "Email already exists"
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form["email"]
+        password = request.form["password"]
+
+        conn = sqlite3.connect("database.db")
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email=?", (email,))
+        user = c.fetchone()
+        conn.close()
+
+        if user and bcrypt.checkpw(password.encode(), user[3]):
+            session["user"] = user[1]
+            return redirect(url_for("dashboard"))
+        else:
+            return "Invalid credentials"
+
+    return render_template("login.html")
+
+
+@app.route("/dashboard")
+def dashboard():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    return render_template("dashboard.html", username=session["user"])
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("landing"))
+
+
+# ---------- INDUSTRY ROUTES ----------
+
+@app.route("/fintech")
+def fintech():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("fintech.html")
+
+
+@app.route("/edtech")
+def edtech():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("edtech.html")
+
+
+@app.route("/it")
+def it():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("it.html")
+
+
+@app.route("/ecommerce")
+def ecommerce():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("ecommerce.html")
+
+
+@app.route("/healthcare")
+def healthcare():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("healthcare.html")
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
